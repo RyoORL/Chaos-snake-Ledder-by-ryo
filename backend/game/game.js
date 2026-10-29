@@ -1,8 +1,9 @@
 const crypto = require('crypto');
-const SNAKES = {16:6,47:26,49:11,56:53,62:19,64:60,87:24,93:73,95:75,98:78};
-const LADDERS = {3:22,4:14,9:31,21:42,28:84,36:44,51:67,71:91,80:99};
+const SNAKES = {12:9,17:6,22:1,34:14,45:26,52:30,63:39,68:33,75:46,81:60,89:51,93:73,96:74,98:44};
+const LADDERS = {11:29,15:27,20:41,37:57,43:58,50:70,65:76,67:86,79:83,88:92};
 const WEIGHTS = {rocket:16,shield:15,bomb:15,freeze:10,swap:8,precision:10,magnet:8,lucky:12,trap:6}; // sums to 100
 const TURN_MS = 15000, MAX_ITEMS = 3;
+const BOX_START = 15, BOX_MAX = 30, BOX_MIN_MS = 1000, BOX_RANGE_MS = 600; // 5x more loot boxes
 const fail = m => { throw new Error(m); };
 const pickItem = () => { let r = Math.random()*100; for (const [k,w] of Object.entries(WEIGHTS)) if ((r-=w) < 0) return k; return 'rocket'; };
 
@@ -32,7 +33,7 @@ class Room {
     this.players.forEach(x => this.resetPlayer(x));
     this.turn = crypto.randomInt(this.players.length);
     this.say('Match started!');
-    for (let i = 0; i < 3; i++) this.spawn();
+    for (let i = 0; i < BOX_START; i++) this.spawn();
     this.scheduleSpawn(); this.startTurn();
   }
   again(p) {
@@ -49,9 +50,9 @@ class Room {
     clearTimeout(this.spawnTimer);
     this.spawnTimer = setTimeout(() => {
       if (this.phase !== 'playing') return;
-      if (this.boxes.length < 6) this.spawn();
+      if (this.boxes.length < BOX_MAX) this.spawn();
       this.scheduleSpawn(); this.onChange();
-    }, 5000 + Math.random()*3000);
+    }, BOX_MIN_MS + Math.random()*BOX_RANGE_MS);
   }
   setTimer(ms, fn) { clearTimeout(this.timer); this.deadline = Date.now()+ms; this.timer = setTimeout(() => { if (this.phase==='playing') { fn(); this.onChange(); } }, ms); }
   startTurn() {

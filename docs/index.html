@@ -16,14 +16,18 @@ input{font:inherit;width:100%;padding:14px;border-radius:12px;border:2px solid #
 #bar button{min-height:36px;padding:6px 10px;flex:none}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444}.dot.on{background:#22c55e}
 .hide{display:none!important}
-#board{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;width:100%;aspect-ratio:1;background:#0008;padding:3px;border-radius:12px}
-.c{position:relative;background:#2a2f7a;border-radius:4px;font-size:clamp(7px,2.3vw,11px);display:flex;flex-wrap:wrap;align-content:flex-start;overflow:hidden;padding:1px}
-.c:nth-child(odd){background:#3a2a82}.c i{font-style:normal;opacity:.6;width:100%;line-height:1}
-.c b{width:100%;font-size:clamp(9px,3vw,14px);line-height:1;text-align:center}
-.c.box{box-shadow:inset 0 0 10px 2px gold;animation:glow 1s infinite alternate}
-@keyframes glow{to{box-shadow:inset 0 0 14px 4px #ffd84d}}
-.tk{width:clamp(8px,2.6vw,14px);height:clamp(8px,2.6vw,14px);border-radius:50%;border:1.5px solid #fff;margin:1px}
-.tk.pop{animation:pop .4s}@keyframes pop{0%{transform:scale(2.2)}100%{transform:scale(1)}}
+#bw{position:relative;width:100%;aspect-ratio:1;container-type:inline-size;border-radius:12px;overflow:hidden;background:#0b1240;border:3px solid #1e3a8a}
+#board{display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(10,1fr);width:100%;height:100%}
+.c{position:relative;background:#2a3a9a;box-shadow:inset 0 0 0 1px #0007;font-size:9px;font-size:2.5cqw;padding:2px 3px;overflow:hidden}
+.c.alt{background:#3b2a8f}.c i{font-style:normal;opacity:.8}
+#c100{background:#b7791f}#c100 i::after{content:" 👑"}#c1{background:#15803d}#c1 i::after{content:" START"}
+.c b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-size:5.2cqw}
+.c.box b{animation:pu 1s infinite;filter:drop-shadow(0 0 3px gold)}@keyframes pu{50%{transform:scale(1.18)}}
+#bsvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.tk{position:absolute;width:8.6%;height:8.6%;border-radius:50%;border:2px solid;border-width:.7cqw;background:#1b1550;display:flex;align-items:center;justify-content:center;font-size:16px;font-size:5cqw;line-height:1;transition:left .5s ease,top .5s ease;z-index:3;box-shadow:0 1px 4px #000a}
+.tk.off{opacity:.45}.tk.turn{animation:bn .8s infinite}@keyframes bn{50%{transform:translateY(-12%)}}
+.tk.me::after{content:"▼";position:absolute;top:-62%;left:50%;transform:translateX(-50%);font-size:3cqw;color:gold}
+.tk small{position:absolute;top:100%;font-size:2.3cqw;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap}
 #players{display:flex;gap:6px;overflow-x:auto}.pl{flex:none;background:#ffffff1a;border-radius:10px;padding:6px 8px;font-size:13px;border:2px solid transparent}.pl.turn{border-color:gold}
 #dice{font-size:44px;text-align:center}#dice.roll{animation:spin .6s}@keyframes spin{to{transform:rotate(540deg)}}
 #inv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}#inv button{font-size:26px;background:#1e3a8a;box-shadow:0 3px 0 #172554;min-height:64px}
@@ -47,7 +51,7 @@ h1{text-align:center;margin:12px 0}
 <section id="game" class="hide">
 <div id="players"></div>
 <div class="card row"><div id="turnTxt"></div><div id="timer" style="text-align:right;font-size:24px;flex:none;width:60px"></div></div>
-<div id="board"></div>
+<div id="bw"><div id="board"></div><svg id="bsvg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div>
 <div class="card row"><div id="dice">🎲</div><button id="act" class="go" style="flex:2">Roll</button></div>
 <div id="inv"></div><div class="card" id="log"></div></section>
 </main><div id="modal" class="hide"><div id="mb"></div></div><div id="toast" class="hide"></div>
@@ -55,10 +59,11 @@ h1{text-align:center;margin:12px 0}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 const $=s=>document.querySelector(s), esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const FACES=['😎','🤠','🐸','🐼','🦊','🐵'],SC=['#e11d48','#22c55e','#8b5cf6','#06b6d4','#facc15','#a855f7','#3b82f6','#f97316','#ec4899','#ef4444','#16a34a','#0ea5e9','#eab308','#7c3aed'];
 const COLORS=['#ef4444','#3b82f6','#22c55e','#eab308','#ec4899','#f97316'];
 const IT={rocket:['🚀','Rocket +5',0],shield:['🛡️','Shield (auto-blocks)',0],bomb:['💣','Bomb −3',1],freeze:['❄️','Freeze',1],swap:['🔄','Swap',1],precision:['🎯','Precision Dice',2],magnet:['🧲','Magnet',1],lucky:['🍀','Lucky +2',0],trap:['🪤','Trap −4',0]};
 const socket=io(window.SERVER_URL,{transports:['websocket','polling']});
-let S=null,me=null,endAt=0,lastN=0,prevPos={},muted=false,ac;
+let drawn=false,tks={},S=null,me=null,endAt=0,lastN=0,prevPos={},muted=false,ac;
 const sv=()=>{try{return JSON.parse(localStorage.sc||'null')}catch(e){return null}};
 const saved=r=>{if(r.error){if(r.fatal)localStorage.removeItem('sc');return toast(r.error)}localStorage.sc=JSON.stringify(r)};
 const send=(ev,d)=>socket.emit(ev,d||{},r=>{if(r&&r.error)toast(r.error)});
@@ -78,7 +83,25 @@ $('#copy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(S.cod
 $('#act').onclick=()=>send(S.stage==='roll'?'roll':'end');
 
 const board=$('#board');
-for(let r=0;r<10;r++)for(let c=0;c<10;c++){const row=9-r,n=row*10+(row%2?10-c:c+1);const d=document.createElement('div');d.className='c';d.id='c'+n;d.innerHTML=`<i>${n}</i><b></b><span style="display:flex;flex-wrap:wrap"></span>`;board.appendChild(d)}
+for(let r=0;r<10;r++)for(let c=0;c<10;c++){const row=9-r,n=row*10+(row%2?10-c:c+1);const d=document.createElement('div');d.className='c'+((r+c)%2?' alt':'');d.id='c'+n;d.innerHTML=`<i>${n}</i><b></b>`;board.appendChild(d)}
+function cellXY(n){n=Math.max(1,n);const ri=Math.floor((n-1)/10),w=(n-1)%10,c=ri%2?9-w:w;return[c*10+5,(9-ri)*10+5]}
+function drawMap(){const o=[];let k=0;
+ for(const[b,t]of Object.entries(S.LADDERS)){const[x1,y1]=cellXY(+b),[x2,y2]=cellXY(t),dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),nx=-dy/L*1.2,ny=dx/L*1.2;
+  o.push(`<line x1="${x1+nx}" y1="${y1+ny}" x2="${x2+nx}" y2="${y2+ny}" stroke="#b9783a" stroke-width=".8"/><line x1="${x1-nx}" y1="${y1-ny}" x2="${x2-nx}" y2="${y2-ny}" stroke="#b9783a" stroke-width=".8"/>`);
+  for(let i=1;i<L/3;i++){const f=i*3/L,px=x1+dx*f,py=y1+dy*f;o.push(`<line x1="${px+nx}" y1="${py+ny}" x2="${px-nx}" y2="${py-ny}" stroke="#e0a867" stroke-width=".6"/>`)}}
+ for(const[h,t]of Object.entries(S.SNAKES)){const[x1,y1]=cellXY(+h),[x2,y2]=cellXY(t),dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),sg=(k%2?1:-1)*L*.18,nx=-dy/L*sg,ny=dx/L*sg,col=SC[k++%SC.length];
+  const d=`M${x1} ${y1}C${x1+dx/3+nx} ${y1+dy/3+ny} ${x1+2*dx/3-nx} ${y1+2*dy/3-ny} ${x2} ${y2}`;
+  o.push(`<path d="${d}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#ffffff66" stroke-width="1" stroke-dasharray=".8 2" stroke-linecap="round"/><circle cx="${x1}" cy="${y1}" r="2.5" fill="${col}"/><circle cx="${x1-.9}" cy="${y1-.6}" r=".8" fill="#fff"/><circle cx="${x1+.9}" cy="${y1-.6}" r=".8" fill="#fff"/><circle cx="${x1-.9}" cy="${y1-.6}" r=".35"/><circle cx="${x1+.9}" cy="${y1-.6}" r=".35"/>`)}
+ $('#bsvg').innerHTML=o.join('')}
+function placeTokens(){const g={},seen=new Set();
+ S.players.forEach((p,i)=>{const n=Math.max(1,p.pos);(g[n]=g[n]||[]).push(i)});
+ S.players.forEach((p,i)=>{seen.add(p.id);let t=tks[p.id];if(!t){t=tks[p.id]=document.createElement('div');$('#bw').appendChild(t)}
+  const gr=g[Math.max(1,p.pos)],j=gr.indexOf(i),m=gr.length,[x,y]=cellXY(p.pos);
+  const dx=m>1?(j%3-(Math.min(m,3)-1)/2)*3.4:0,dy=m>3?(Math.floor(j/3)-.5)*4:0;
+  t.style.left=(x-4.3+dx)+'%';t.style.top=(y-4.3+dy)+'%';t.style.borderColor=COLORS[p.color];
+  t.innerHTML=FACES[p.color]+`<small>${esc(p.name)}</small>`;
+  t.className='tk'+(p.id===S.turn?' turn':'')+(p.id===S.me?' me':'')+(p.connected?'':' off')});
+ for(const id in tks)if(!seen.has(id)){tks[id].remove();delete tks[id]}}
 
 socket.on('state',s=>{const old=S;S=s;me=s.players.find(p=>p.id===s.me);
  if(old&&old.phase==='lobby'&&s.phase==='playing')beep(700);
@@ -88,35 +111,20 @@ function render(){
  for(const id of['home','lobby','game'])$('#'+id).classList.toggle('hide',id!==ph);
  $('#rc').classList.toggle('hide',!S);if(!S)return;$('#code').textContent=S.code;
  if(ph==='lobby'){closeM();
-  $('#lpl').innerHTML=S.players.map(p=>`<div class="card row"><span><span class="tk" style="display:inline-block;background:${COLORS[p.color]}"></span> ${esc(p.name)}${p.id===S.host?' 👑':''}${p.id===S.me?' (you)':''}</span><span style="text-align:right">${p.connected?(p.ready?'✅ Ready':'…'):'offline'}</span></div>`).join('');
+  $('#lpl').innerHTML=S.players.map(p=>`<div class="card row"><span><span style="font-size:22px">${FACES[p.color]}</span> ${esc(p.name)}${p.id===S.host?' 👑':''}${p.id===S.me?' (you)':''}</span><span style="text-align:right">${p.connected?(p.ready?'✅ Ready':'…'):'offline'}</span></div>`).join('');
   $('#ready').textContent=me.ready?'Not ready':'Ready';$('#start').classList.toggle('hide',S.host!==S.me);return}
  endAt=Date.now()+S.left;
  const byId=Object.fromEntries(S.players.map(p=>[p.id,p])),cur=byId[S.turn],mine=S.turn===S.me;
- $('#players').innerHTML=S.players.map(p=>`<div class="pl ${p.id===S.turn?'turn':''}"><b style="color:${COLORS[p.color]}">●</b> ${esc(p.name)}${p.connected?'':' 📴'}${p.frozen?' ❄️':''}<br>#${p.pos||'start'} ${p.items.map(i=>IT[i][0]).join('')}</div>`).join('');
- document.querySelectorAll('.c').forEach(c=>{c.classList.remove('box');c.querySelector('b').textContent='';c.querySelector('span').innerHTML=''});
- for(const n in S.SNAKES)$('#c'+n).querySelector('b').textContent='🐍';
- for(const n in S.LADDERS)$('#c'+n).querySelector('b').textContent='🪜';
+ $('#players').innerHTML=S.players.map(p=>`<div class="pl ${p.id===S.turn?'turn':''}"><span style="font-size:18px">${FACES[p.color]}</span> ${esc(p.name)}${p.connected?'':' 📴'}${p.frozen?' ❄️':''}<br>#${p.pos||'start'} ${p.items.map(i=>IT[i][0]).join('')}</div>`).join('');
+ if(!drawn&&S.SNAKES){drawMap();drawn=true}
+ document.querySelectorAll('.c').forEach(c=>{c.classList.remove('box');c.querySelector('b').textContent=''});
  S.traps.forEach(n=>$('#c'+n).querySelector('b').textContent='🪤');
  S.boxes.forEach(n=>{const c=$('#c'+n);c.classList.add('box');c.querySelector('b').textContent='🎁'});
- S.players.forEach(p=>{if(p.pos>0){const t=document.createElement('div');t.className='tk'+(prevPos[p.id]!==p.pos?' pop':'');t.style.background=COLORS[p.color];$('#c'+p.pos).querySelector('span').appendChild(t)}prevPos[p.id]=p.pos});
+ placeTokens();
  if(S.lastRoll&&S.lastRoll.n!==lastN){lastN=S.lastRoll.n;const d=$('#dice');d.classList.remove('roll');void d.offsetWidth;d.classList.add('roll');d.textContent='⚀⚁⚂⚃⚄⚅'[S.lastRoll.v-1];beep(300,.2)}
  const a=$('#act');a.disabled=!mine||S.phase!=='playing';a.textContent=S.stage==='roll'?'Roll 🎲':'End turn';
  $('#turnTxt').textContent=S.phase==='ended'?'Game over':mine?'Your turn!'+(me.precision?` 🎯${me.precision}`:'')+(me.lucky?' 🍀':''):`${cur?esc(cur.name):''}'s turn`;
  $('#inv').innerHTML='';for(let i=0;i<3;i++){const b=document.createElement('button'),it=me.items[i];b.textContent=it?IT[it][0]:'—';b.disabled=!it;b.onclick=()=>useItem(i,it);$('#inv').appendChild(b)}
- $('#log').innerHTML=S.log.slice().reverse().map(esc).join('<br>');
- if(me.pending&&$('#modal').classList.contains('hide'))pendingModal();
- if(S.phase==='ended'&&$('#modal').classList.contains('hide')){const w=byId[S.winner];modal(`<h2 style="text-align:center">🏆 ${esc(w?w.name:'')} wins!</h2>`,[...(S.host===S.me?[['Play again',()=>send('again')]]:[]),['Close']]);beep(900,.5)}
-}
-function useItem(slot,it){
- const [,name,k]=IT[it];if(it==='shield')return toast('Shield blocks attacks automatically');
- if(k===0)return send('use',{slot});
- if(k===2)return modal(`<h3>Pick next roll</h3>`,[1,2,3,4,5,6].map(v=>[String(v),()=>send('use',{slot,value:v})]).concat([['Cancel']]));
- modal(`<h3>${name}: choose target</h3>`,S.players.filter(p=>p.id!==S.me).map(p=>[`${p.name} (#${p.pos||'start'})`,()=>send('use',{slot,target:p.id})]).concat([['Cancel']]));
-}
-function pendingModal(){modal(`<h3>Inventory full — new item ${IT[me.pending][0]}</h3><p>Replace one?</p>`,me.items.map((it,i)=>['Replace '+IT[it][0],()=>send('loot',{slot:i})]).concat([['Leave it',()=>send('loot',{slot:null})]]))}
-setInterval(()=>{if(S&&S.phase==='playing'){const s=Math.max(0,Math.ceil((endAt-Date.now())/1000));$('#timer').textContent=s}},250);
-render();
-</script></body></html>ppendChild(b)}
  $('#log').innerHTML=S.log.slice().reverse().map(esc).join('<br>');
  if(me.pending&&$('#modal').classList.contains('hide'))pendingModal();
  if(S.phase==='ended'&&$('#modal').classList.contains('hide')){const w=byId[S.winner];modal(`<h2 style="text-align:center">🏆 ${esc(w?w.name:'')} wins!</h2>`,[...(S.host===S.me?[['Play again',()=>send('again')]]:[]),['Close']]);beep(900,.5)}

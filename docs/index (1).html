@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Snake & Chaos</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;max-width:100%;overflow-x:hidden}
+body{font-family:system-ui,sans-serif;color:#fff;background:linear-gradient(160deg,#0d1b4c,#3b1b6e);min-height:100vh;padding:8px;padding-bottom:env(safe-area-inset-bottom)}
+main{max-width:560px;margin:0 auto}
+button{font:inherit;font-weight:700;color:#fff;background:#7c3aed;border:0;border-radius:14px;padding:14px;min-height:48px;cursor:pointer;box-shadow:0 3px 0 #4c1d95}
+button:disabled{opacity:.4}button.alt{background:#0ea5e9;box-shadow:0 3px 0 #075985}button.go{background:#22c55e;box-shadow:0 3px 0 #166534}
+input{font:inherit;width:100%;padding:14px;border-radius:12px;border:2px solid #6d4bd8;background:#14123a;color:#fff;margin:4px 0}
+.card{background:#ffffff14;border-radius:16px;padding:12px;margin:8px 0}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+#bar{display:flex;justify-content:space-between;align-items:center;font-size:14px;gap:6px}
+#bar button{min-height:36px;padding:6px 10px;flex:none}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444}.dot.on{background:#22c55e}
+.hide{display:none!important}
+#board{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;width:100%;aspect-ratio:1;background:#0008;padding:3px;border-radius:12px}
+.c{position:relative;background:#2a2f7a;border-radius:4px;font-size:clamp(7px,2.3vw,11px);display:flex;flex-wrap:wrap;align-content:flex-start;overflow:hidden;padding:1px}
+.c:nth-child(odd){background:#3a2a82}.c i{font-style:normal;opacity:.6;width:100%;line-height:1}
+.c b{width:100%;font-size:clamp(9px,3vw,14px);line-height:1;text-align:center}
+.c.box{box-shadow:inset 0 0 10px 2px gold;animation:glow 1s infinite alternate}
+@keyframes glow{to{box-shadow:inset 0 0 14px 4px #ffd84d}}
+.tk{width:clamp(8px,2.6vw,14px);height:clamp(8px,2.6vw,14px);border-radius:50%;border:1.5px solid #fff;margin:1px}
+.tk.pop{animation:pop .4s}@keyframes pop{0%{transform:scale(2.2)}100%{transform:scale(1)}}
+#players{display:flex;gap:6px;overflow-x:auto}.pl{flex:none;background:#ffffff1a;border-radius:10px;padding:6px 8px;font-size:13px;border:2px solid transparent}.pl.turn{border-color:gold}
+#dice{font-size:44px;text-align:center}#dice.roll{animation:spin .6s}@keyframes spin{to{transform:rotate(540deg)}}
+#inv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}#inv button{font-size:26px;background:#1e3a8a;box-shadow:0 3px 0 #172554;min-height:64px}
+#log{font-size:13px;opacity:.9;max-height:140px;overflow:auto}
+#modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+#modal>div{background:#1b1550;border-radius:18px;padding:16px;width:100%;max-width:360px;display:grid;gap:8px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:20px;z-index:10;max-width:90%}
+h1{text-align:center;margin:12px 0}
+</style></head><body><main>
+<div id="bar"><span><span class="dot" id="dot"></span> <span id="conn">connecting</span></span>
+<span id="rc" class="hide">Room <b id="code"></b> <button id="copy">Copy</button></span><button id="snd">🔊</button></div>
+
+<section id="home"><h1>🐍 Snake & Chaos 🪜</h1><div class="card">
+<input id="name" maxlength="12" placeholder="Your name"><button class="go" id="create" style="width:100%">Create room</button></div>
+<div class="card"><input id="jcode" maxlength="4" placeholder="Room code" style="text-transform:uppercase"><button class="alt" id="join" style="width:100%">Join room</button></div></section>
+
+<section id="lobby" class="hide"><h1>Lobby</h1><div id="lpl"></div>
+<div class="row"><button id="ready">Ready</button><button class="go" id="start">Start</button></div>
+<p style="text-align:center;opacity:.7">Share the room code. 2–6 players.</p></section>
+
+<section id="game" class="hide">
+<div id="players"></div>
+<div class="card row"><div id="turnTxt"></div><div id="timer" style="text-align:right;font-size:24px;flex:none;width:60px"></div></div>
+<div id="board"></div>
+<div class="card row"><div id="dice">🎲</div><button id="act" class="go" style="flex:2">Roll</button></div>
+<div id="inv"></div><div class="card" id="log"></div></section>
+</main><div id="modal" class="hide"><div id="mb"></div></div><div id="toast" class="hide"></div>
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+const $=s=>document.querySelector(s), esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const COLORS=['#ef4444','#3b82f6','#22c55e','#eab308','#ec4899','#f97316'];
+const IT={rocket:['🚀','Rocket +5',0],shield:['🛡️','Shield (auto-blocks)',0],bomb:['💣','Bomb −3',1],freeze:['❄️','Freeze',1],swap:['🔄','Swap',1],precision:['🎯','Precision Dice',2],magnet:['🧲','Magnet',1],lucky:['🍀','Lucky +2',0],trap:['🪤','Trap −4',0]};
+const socket=io(window.SERVER_URL,{transports:['websocket','polling']});
+let S=null,me=null,endAt=0,lastN=0,prevPos={},muted=false,ac;
+const sv=()=>{try{return JSON.parse(localStorage.sc||'null')}catch(e){return null}};
+const saved=r=>{if(r.error){if(r.fatal)localStorage.removeItem('sc');return toast(r.error)}localStorage.sc=JSON.stringify(r)};
+const send=(ev,d)=>socket.emit(ev,d||{},r=>{if(r&&r.error)toast(r.error)});
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hide');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.add('hide'),2200)}
+function beep(f=500,d=.12){if(muted)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
+function modal(html,btns){$('#mb').innerHTML=html;for(const[l,fn]of btns){const b=document.createElement('button');b.textContent=l;b.onclick=()=>{closeM();fn&&fn()};$('#mb').appendChild(b)}$('#modal').classList.remove('hide')}
+const closeM=()=>$('#modal').classList.add('hide');
+
+socket.on('connect',()=>{$('#dot').classList.add('on');$('#conn').textContent='online';const s=sv();if(s)socket.emit('join',s,saved)});
+socket.on('disconnect',()=>{$('#dot').classList.remove('on');$('#conn').textContent='reconnecting…'});
+socket.on('kicked',()=>{localStorage.removeItem('sc');toast('Opened in another tab');S=null;render()});
+$('#create').onclick=()=>socket.emit('create',{name:$('#name').value},saved);
+$('#join').onclick=()=>socket.emit('join',{name:$('#name').value,code:$('#jcode').value},saved);
+$('#ready').onclick=()=>send('ready');$('#start').onclick=()=>send('start');
+$('#snd').onclick=()=>{muted=!muted;$('#snd').textContent=muted?'🔇':'🔊'};
+$('#copy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(S.code);toast('Code copied')};
+$('#act').onclick=()=>send(S.stage==='roll'?'roll':'end');
+
+const board=$('#board');
+for(let r=0;r<10;r++)for(let c=0;c<10;c++){const row=9-r,n=row*10+(row%2?10-c:c+1);const d=document.createElement('div');d.className='c';d.id='c'+n;d.innerHTML=`<i>${n}</i><b></b><span style="display:flex;flex-wrap:wrap"></span>`;board.appendChild(d)}
+
+socket.on('state',s=>{const old=S;S=s;me=s.players.find(p=>p.id===s.me);
+ if(old&&old.phase==='lobby'&&s.phase==='playing')beep(700);
+ render();});
+function render(){
+ const ph=!S?'home':S.phase==='lobby'?'lobby':'game';
+ for(const id of['home','lobby','game'])$('#'+id).classList.toggle('hide',id!==ph);
+ $('#rc').classList.toggle('hide',!S);if(!S)return;$('#code').textContent=S.code;
+ if(ph==='lobby'){closeM();
+  $('#lpl').innerHTML=S.players.map(p=>`<div class="card row"><span><span class="tk" style="display:inline-block;background:${COLORS[p.color]}"></span> ${esc(p.name)}${p.id===S.host?' 👑':''}${p.id===S.me?' (you)':''}</span><span style="text-align:right">${p.connected?(p.ready?'✅ Ready':'…'):'offline'}</span></div>`).join('');
+  $('#ready').textContent=me.ready?'Not ready':'Ready';$('#start').classList.toggle('hide',S.host!==S.me);return}
+ endAt=Date.now()+S.left;
+ const byId=Object.fromEntries(S.players.map(p=>[p.id,p])),cur=byId[S.turn],mine=S.turn===S.me;
+ $('#players').innerHTML=S.players.map(p=>`<div class="pl ${p.id===S.turn?'turn':''}"><b style="color:${COLORS[p.color]}">●</b> ${esc(p.name)}${p.connected?'':' 📴'}${p.frozen?' ❄️':''}<br>#${p.pos||'start'} ${p.items.map(i=>IT[i][0]).join('')}</div>`).join('');
+ document.querySelectorAll('.c').forEach(c=>{c.classList.remove('box');c.querySelector('b').textContent='';c.querySelector('span').innerHTML=''});
+ for(const n in S.SNAKES)$('#c'+n).querySelector('b').textContent='🐍';
+ for(const n in S.LADDERS)$('#c'+n).querySelector('b').textContent='🪜';
+ S.traps.forEach(n=>$('#c'+n).querySelector('b').textContent='🪤');
+ S.boxes.forEach(n=>{const c=$('#c'+n);c.classList.add('box');c.querySelector('b').textContent='🎁'});
+ S.players.forEach(p=>{if(p.pos>0){const t=document.createElement('div');t.className='tk'+(prevPos[p.id]!==p.pos?' pop':'');t.style.background=COLORS[p.color];$('#c'+p.pos).querySelector('span').appendChild(t)}prevPos[p.id]=p.pos});
+ if(S.lastRoll&&S.lastRoll.n!==lastN){lastN=S.lastRoll.n;const d=$('#dice');d.classList.remove('roll');void d.offsetWidth;d.classList.add('roll');d.textContent='⚀⚁⚂⚃⚄⚅'[S.lastRoll.v-1];beep(300,.2)}
+ const a=$('#act');a.disabled=!mine||S.phase!=='playing';a.textContent=S.stage==='roll'?'Roll 🎲':'End turn';
+ $('#turnTxt').textContent=S.phase==='ended'?'Game over':mine?'Your turn!'+(me.precision?` 🎯${me.precision}`:'')+(me.lucky?' 🍀':''):`${cur?esc(cur.name):''}'s turn`;
+ $('#inv').innerHTML='';for(let i=0;i<3;i++){const b=document.createElement('button'),it=me.items[i];b.textContent=it?IT[it][0]:'—';b.disabled=!it;b.onclick=()=>useItem(i,it);$('#inv').appendChild(b)}
+ $('#log').innerHTML=S.log.slice().reverse().map(esc).join('<br>');
+ if(me.pending&&$('#modal').classList.contains('hide'))pendingModal();
+ if(S.phase==='ended'&&$('#modal').classList.contains('hide')){const w=byId[S.winner];modal(`<h2 style="text-align:center">🏆 ${esc(w?w.name:'')} wins!</h2>`,[...(S.host===S.me?[['Play again',()=>send('again')]]:[]),['Close']]);beep(900,.5)}
+}
+function useItem(slot,it){
+ const [,name,k]=IT[it];if(it==='shield')return toast('Shield blocks attacks automatically');
+ if(k===0)return send('use',{slot});
+ if(k===2)return modal(`<h3>Pick next roll</h3>`,[1,2,3,4,5,6].map(v=>[String(v),()=>send('use',{slot,value:v})]).concat([['Cancel']]));
+ modal(`<h3>${name}: choose target</h3>`,S.players.filter(p=>p.id!==S.me).map(p=>[`${p.name} (#${p.pos||'start'})`,()=>send('use',{slot,target:p.id})]).concat([['Cancel']]));
+}
+function pendingModal(){modal(`<h3>Inventory full — new item ${IT[me.pending][0]}</h3><p>Replace one?</p>`,me.items.map((it,i)=>['Replace '+IT[it][0],()=>send('loot',{slot:i})]).concat([['Leave it',()=>send('loot',{slot:null})]]))}
+setInterval(()=>{if(S&&S.phase==='playing'){const s=Math.max(0,Math.ceil((endAt-Date.now())/1000));$('#timer').textContent=s}},250);
+render();
+</script></body></html>ppendChild(b)}
+ $('#log').innerHTML=S.log.slice().reverse().map(esc).join('<br>');
+ if(me.pending&&$('#modal').classList.contains('hide'))pendingModal();
+ if(S.phase==='ended'&&$('#modal').classList.contains('hide')){const w=byId[S.winner];modal(`<h2 style="text-align:center">🏆 ${esc(w?w.name:'')} wins!</h2>`,[...(S.host===S.me?[['Play again',()=>send('again')]]:[]),['Close']]);beep(900,.5)}
+}
+function useItem(slot,it){
+ const [,name,k]=IT[it];if(it==='shield')return toast('Shield blocks attacks automatically');
+ if(k===0)return send('use',{slot});
+ if(k===2)return modal(`<h3>Pick next roll</h3>`,[1,2,3,4,5,6].map(v=>[String(v),()=>send('use',{slot,value:v})]).concat([['Cancel']]));
+ modal(`<h3>${name}: choose target</h3>`,S.players.filter(p=>p.id!==S.me).map(p=>[`${p.name} (#${p.pos||'start'})`,()=>send('use',{slot,target:p.id})]).concat([['Cancel']]));
+}
+function pendingModal(){modal(`<h3>Inventory full — new item ${IT[me.pending][0]}</h3><p>Replace one?</p>`,me.items.map((it,i)=>['Replace '+IT[it][0],()=>send('loot',{slot:i})]).concat([['Leave it',()=>send('loot',{slot:null})]]))}
+setInterval(()=>{if(S&&S.phase==='playing'){const s=Math.max(0,Math.ceil((endAt-Date.now())/1000));$('#timer').textContent=s}},250);
+render();
+</script></body></html>

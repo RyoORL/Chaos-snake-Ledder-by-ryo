@@ -116,4 +116,18 @@ function useItem(slot,it){
 function pendingModal(){modal(`<h3>Inventory full — new item ${IT[me.pending][0]}</h3><p>Replace one?</p>`,me.items.map((it,i)=>['Replace '+IT[it][0],()=>send('loot',{slot:i})]).concat([['Leave it',()=>send('loot',{slot:null})]]))}
 setInterval(()=>{if(S&&S.phase==='playing'){const s=Math.max(0,Math.ceil((endAt-Date.now())/1000));$('#timer').textContent=s}},250);
 render();
+</script></body></html>ppendChild(b)}
+ $('#log').innerHTML=S.log.slice().reverse().map(esc).join('<br>');
+ if(me.pending&&$('#modal').classList.contains('hide'))pendingModal();
+ if(S.phase==='ended'&&$('#modal').classList.contains('hide')){const w=byId[S.winner];modal(`<h2 style="text-align:center">🏆 ${esc(w?w.name:'')} wins!</h2>`,[...(S.host===S.me?[['Play again',()=>send('again')]]:[]),['Close']]);beep(900,.5)}
+}
+function useItem(slot,it){
+ const [,name,k]=IT[it];if(it==='shield')return toast('Shield blocks attacks automatically');
+ if(k===0)return send('use',{slot});
+ if(k===2)return modal(`<h3>Pick next roll</h3>`,[1,2,3,4,5,6].map(v=>[String(v),()=>send('use',{slot,value:v})]).concat([['Cancel']]));
+ modal(`<h3>${name}: choose target</h3>`,S.players.filter(p=>p.id!==S.me).map(p=>[`${p.name} (#${p.pos||'start'})`,()=>send('use',{slot,target:p.id})]).concat([['Cancel']]));
+}
+function pendingModal(){modal(`<h3>Inventory full — new item ${IT[me.pending][0]}</h3><p>Replace one?</p>`,me.items.map((it,i)=>['Replace '+IT[it][0],()=>send('loot',{slot:i})]).concat([['Leave it',()=>send('loot',{slot:null})]]))}
+setInterval(()=>{if(S&&S.phase==='playing'){const s=Math.max(0,Math.ceil((endAt-Date.now())/1000));$('#timer').textContent=s}},250);
+render();
 </script></body></html>
